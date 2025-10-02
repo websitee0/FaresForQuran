@@ -1,4 +1,4 @@
-* {
+* { 
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -253,3 +253,8 @@ body.light .ayah.playing { background: rgba(0,0,0,0.06); }
 .footer .credits { opacity: 0.8; font-size: 0.9em; }
 
 body.light .footer { background: linear-gradient(180deg, rgba(250,247,242,0.85), rgba(250,247,242,1)); color: #1c1a19; border-top-color: #e8e1d7be; }
+
+/* Ensure mobile-only buttons are visible on small/medium screens (override cascade) */
+@media (max-width: 900px) {
+    .only-mobile { display: inline-flex !important; }
+}
