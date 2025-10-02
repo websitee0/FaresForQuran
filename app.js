@@ -25,6 +25,16 @@
     let currentAyahIndex = -1;
     let currentAyahs = [];
     let currentSurahNumber = null;
+    const audioUrlCache = new Map();
+    const RECITER_SLUGS = {
+        'ar.alafasy': 'ar.alafasy',
+        'ar.husary': 'ar.husary',
+        'ar.hudhaify': 'ar.hudhaify',
+        'ar.minshawi': 'ar.minshawi',
+        'ar.shaatree': 'ar.shaatree',
+        'ar.mahermuaiqly': 'ar.mahermuaiqly',
+    };
+    const FALLBACK_RECITER = 'ar.alafasy';
 
     applyFontScale();
     applyTheme();
@@ -238,7 +248,22 @@
         }
     }
 
-    function playAyah(index, restart = false) {
+    async function getAudioUrl(ayahGlobalNumber, reciterEdition) {
+        const cacheKey = `${reciterEdition}:${ayahGlobalNumber}`;
+        if (audioUrlCache.has(cacheKey)) return audioUrlCache.get(cacheKey);
+        try {
+            const res = await fetch(`${API_BASE}/ayah/${ayahGlobalNumber}/${reciterEdition}`);
+            const json = await res.json();
+            const url = json?.data?.audio;
+            if (url) {
+                audioUrlCache.set(cacheKey, url);
+                return url;
+            }
+        } catch (_) { /* ignore */ }
+        return null;
+    }
+
+    async function playAyah(index, restart = false) {
         if (!currentAyahs || index < 0 || index >= currentAyahs.length) return;
 
         // highlight
@@ -261,9 +286,17 @@
             if (!restart) currentAudio.currentTime = 0;
         }
 
-        const reciter = reciterSelect ? reciterSelect.value : 'ar.alafasy';
+        const selected = reciterSelect ? reciterSelect.value : FALLBACK_RECITER;
+        const reciter = RECITER_SLUGS[selected] || FALLBACK_RECITER;
         const ayah = currentAyahs[index];
-        const url = `https://cdn.islamic.network/quran/audio/128/${reciter}/${ayah.number}.mp3`;
+        let url = await getAudioUrl(ayah.number, reciter);
+        if (!url) {
+            url = await getAudioUrl(ayah.number, FALLBACK_RECITER);
+        }
+        if (!url) {
+            if (playPauseBtn) playPauseBtn.textContent = '▶';
+            return;
+        }
         currentAudio = new Audio(url);
         currentAyahIndex = index;
         if (playPauseBtn) playPauseBtn.textContent = '⏸';
@@ -273,9 +306,12 @@
         // Preload next for smoother transition
         const next = currentAyahs[index + 1];
         if (next) {
-            const pre = new Audio(`https://cdn.islamic.network/quran/audio/128/${reciter}/${next.number}.mp3`);
-            pre.preload = 'auto';
-            // not playing, just caching by the browser
+            getAudioUrl(next.number, reciter).then((nextUrl) => {
+                if (nextUrl) {
+                    const pre = new Audio(nextUrl);
+                    pre.preload = 'auto';
+                }
+            });
         }
 
         currentAudio.onended = () => {
@@ -284,6 +320,9 @@
             } else {
                 if (playPauseBtn) playPauseBtn.textContent = '▶';
             }
+        };
+        currentAudio.onerror = () => {
+            if (playPauseBtn) playPauseBtn.textContent = '▶';
         };
     }
 
